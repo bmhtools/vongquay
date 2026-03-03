@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vòng Quay VNLMS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <h1>🎡 Vòng Quay VNLMS 🎡</h1>
+                <div class="header-controls">
+                    <button class="icon-btn" id="themeBtn" title="Chế độ tối/sáng">🌙</button>
+                    <button class="icon-btn" id="soundBtn" title="Âm thanh">🔊</button>
+                </div>
+            </div>
+            <p class="subtitle">Tạo vòng quay của riêng bạn</p>
+        </div>
+
+        <!-- Modal Tạo mới / Chỉnh sửa -->
+        <div id="editModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle">Tạo Vòng Quay Mới</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Các lựa chọn (mỗi dòng một lựa chọn):</label>
+                        <textarea id="itemsInput" placeholder="VD:&#10;Mì ý&#10;Phở&#10;Bún chả&#10;Cơm tấm&#10;Pizza" rows="10"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Số lượng lựa chọn: <strong id="itemCount">0</strong></label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" id="closeEditBtn">Hủy</button>
+                    <button class="btn-primary" id="saveWheelBtn">Lưu & Quay</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Danh sách đã lưu -->
+        <div id="savedWheelsModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>📚 Vòng Quay Đã Lưu</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="savedWheelsList" class="saved-wheels-list">
+                        <p class="empty-message">Chưa có vòng quay nào được lưu</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-primary" id="closeSavedBtn">Đóng</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Chia sẻ -->
+        <div id="shareModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>📤 Chia Sẻ</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="share-options">
+                        <button class="share-btn" id="shareJson">📋 Sao chép JSON</button>
+                        <button class="share-btn" id="downloadJson">💾 Tải JSON</button>
+                        <button class="share-btn" id="exportCsv">📊 Xuất CSV</button>
+                    </div>
+                    <div id="shareMessage" style="margin-top: 15px; text-align: center; color: #667eea;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-primary" id="closeShareBtn">Đóng</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="wheel-section">
+                <div class="wheel-info">
+                    <h2 id="currentWheelName">Vòng Quay</h2>
+                    <p id="itemCountDisplay">0 lựa chọn</p>
+                </div>
+
+                <div class="wheel-container">
+                    <canvas id="wheelCanvas" width="400" height="400"></canvas>
+                    <div class="spin-button" id="spinBtn">
+                        <span>QUAY</span>
+                    </div>
+                </div>
+
+                <div class="wheel-controls">
+                    <button class="btn-secondary" id="newWheelBtn">+ Tạo Mới</button>
+                    <button class="btn-secondary" id="editWheelBtn">✏️ Chỉnh Sửa</button>
+                    <button class="btn-secondary" id="shareBtn">📤 Chia Sẻ</button>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <div class="result-box">
+                    <h2>🎉 Kết Quả</h2>
+                    <p id="resultText">Tạo vòng quay để bắt đầu</p>
+                    <button class="btn-secondary" id="copyResultBtn" style="display: none; margin-top: 10px;">📋 Sao chép</button>
+                </div>
+
+                <div class="items-box">
+                    <h3>📋 Danh Sách Lựa Chọn</h3>
+                    <div id="itemsList" class="items-list">
+                        <p class="empty-message">Tạo vòng quay mới để xem danh sách</p>
+                    </div>
+                </div>
+
+                <div class="history-box">
+                    <h3>⏱️ Lịch Sử Quay</h3>
+                    <div id="historyList" class="history-list">
+                        <p class="empty-message">Chưa có kết quả</p>
+                    </div>
+                    <button class="btn-secondary" id="clearHistoryBtn" style="margin-top: 10px; width: 100%;">Xóa lịch sử</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="statistics-section">
+            <h3>📊 Thống Kê</h3>
+            <div id="statsList" class="stats-grid">
+                <p class="empty-message">Quay vòng để xem thống kê</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>✨ Tạo, quay, và chia sẻ vòng quay của bạn! ✨</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
