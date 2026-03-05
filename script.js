@@ -1,23 +1,28 @@
 // ==================== STATE ====================
 let state = {
-    wheels: [], // Danh sách vòng quay đã lưu
-    currentWheel: null, // Vòng quay hiện tại
-    history: [], // Lịch sử quay
+    wheels: [],
+    currentWheel: null,
+    history: [],
     soundEnabled: true,
     darkMode: localStorage.getItem('darkMode') === 'true'
 };
 
-let canvas = document.getElementById('wheelCanvas');
-let ctx = canvas.getContext('2d');
+let canvas = null;
+let ctx = null;
 let isSpinning = false;
 let currentRotation = 0;
 
-// ==================== KHỞI TẠO ====================
+// ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', () => {
+    canvas = document.getElementById('wheelCanvas');
+    ctx = canvas.getContext('2d');
+    
     loadState();
     setupEventListeners();
     applyTheme();
     createDefaultWheel();
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 });
 
 function createDefaultWheel() {
@@ -34,29 +39,30 @@ function createDefaultWheel() {
     }
 }
 
-// ==================== SỰ KIỆN ====================
+// ==================== EVENT LISTENERS ====================
 function setupEventListeners() {
-    // Nút chính
+    // Main buttons
     document.getElementById('newWheelBtn').addEventListener('click', openNewWheelModal);
     document.getElementById('editWheelBtn').addEventListener('click', openEditWheelModal);
+    document.getElementById('loadWheelBtn').addEventListener('click', openSavedWheelsModal);
     document.getElementById('shareBtn').addEventListener('click', openShareModal);
     document.getElementById('spinBtn').addEventListener('click', spin);
 
-    // Modal Edit
+    // Edit Modal
     document.getElementById('saveWheelBtn').addEventListener('click', saveWheel);
     document.getElementById('closeEditBtn').addEventListener('click', closeEditModal);
     document.getElementById('itemsInput').addEventListener('input', updateItemCount);
 
-    // Modal Saved Wheels
+    // Saved Wheels Modal
     document.getElementById('closeSavedBtn').addEventListener('click', closeSavedWheelsModal);
 
-    // Modal Share
-    document.getElementById('shareJson').addEventListener('click', shareJson);
-    document.getElementById('downloadJson').addEventListener('click', downloadJson);
-    document.getElementById('exportCsv').addEventListener('click', exportCsv);
+    // Share Modal
+    document.getElementById('copyJsonBtn').addEventListener('click', shareJson);
+    document.getElementById('downloadJsonBtn').addEventListener('click', downloadJson);
+    document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
     document.getElementById('closeShareBtn').addEventListener('click', closeShareModal);
 
-    // Copy Result
+    // Results & History
     document.getElementById('copyResultBtn').addEventListener('click', copyResult);
     document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
 
@@ -64,24 +70,24 @@ function setupEventListeners() {
     document.getElementById('themeBtn').addEventListener('click', toggleTheme);
     document.getElementById('soundBtn').addEventListener('click', toggleSound);
 
-    // Close modals
-    document.querySelectorAll('.close-btn').forEach(btn => {
+    // Modal close buttons
+    document.querySelectorAll('.modal-close').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.target.closest('.modal').classList.remove('show');
         });
     });
 
+    // Modal overlay clicks
     document.querySelectorAll('.modal').forEach(modal => {
         modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.classList.remove('show');
+            if (e.target === modal || e.target.classList.contains('modal-overlay')) {
+                modal.classList.remove('show');
+            }
         });
     });
-
-    // Resize
-    window.addEventListener('resize', resizeCanvas);
 }
 
-// ==================== VẼ VÒNG QUAY ====================
+// ==================== WHEEL DRAWING ====================
 function drawWheel() {
     if (!state.currentWheel || !state.currentWheel.items || state.currentWheel.items.length === 0) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -105,7 +111,7 @@ function drawWheel() {
         const startAngle = index * sliceAngle + currentRotation;
         const endAngle = startAngle + sliceAngle;
 
-        // Vẽ nền
+        // Draw slice
         ctx.beginPath();
         ctx.moveTo(centerX, centerY);
         ctx.arc(centerX, centerY, radius, startAngle, endAngle);
@@ -113,12 +119,12 @@ function drawWheel() {
         ctx.fillStyle = colors[index % colors.length] || '#' + Math.floor(Math.random() * 16777215).toString(16);
         ctx.fill();
 
-        // Vẽ viền
+        // Draw border
         ctx.strokeStyle = 'white';
         ctx.lineWidth = 3;
         ctx.stroke();
 
-        // Vẽ chữ
+        // Draw text
         ctx.save();
         ctx.translate(centerX, centerY);
         ctx.rotate(startAngle + sliceAngle / 2);
@@ -131,14 +137,14 @@ function drawWheel() {
         ctx.restore();
     });
 
-    // Vẽ đường tròn ngoài
+    // Draw outer circle
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Vẽ tâm điểm
+    // Draw center circle
     ctx.beginPath();
     ctx.arc(centerX, centerY, 15, 0, 2 * Math.PI);
     ctx.fillStyle = '#20C997';
@@ -152,8 +158,8 @@ function drawWheel() {
 
 function drawPointer() {
     const centerX = canvas.width / 2;
-    const topY = 15;
-    const size = 20;
+    const topY = canvas.height * 0.08;
+    const size = canvas.width * 0.08;
 
     ctx.beginPath();
     ctx.moveTo(centerX, topY);
@@ -170,7 +176,8 @@ function drawPointer() {
 function generateColors() {
     const colors = [
         '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-        '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B88B', '#A8E6CF'
+        '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B88B', '#A8E6CF',
+        '#FFB347', '#FF69B4', '#87CEEB', '#98FB98', '#FFD700'
     ];
     const items = state.currentWheel.items.length;
     state.currentWheel.colors = [];
@@ -179,7 +186,7 @@ function generateColors() {
     }
 }
 
-// ==================== QUAY VÒNG ====================
+// ==================== SPINNING ====================
 function spin() {
     if (isSpinning || !state.currentWheel || state.currentWheel.items.length === 0) return;
 
@@ -190,31 +197,34 @@ function spin() {
     playSound();
 
     const totalRotation = (Math.random() * 10 + 5) * 2 * Math.PI;
-    const targetRotation = currentRotation + totalRotation;
-    const spinDuration = 2000;
+    const spinDuration = 4000;
     const startTime = Date.now();
+    const initialRotation = currentRotation;
 
     function animate() {
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / spinDuration, 1);
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        const easeProgress = easeOutCubic(progress);
 
-        currentRotation = currentRotation + (totalRotation * (easeProgress - (isSpinning ? 0 : 1)));
+        currentRotation = initialRotation + (totalRotation * easeProgress);
         drawWheel();
 
         if (progress < 1) {
             requestAnimationFrame(animate);
         } else {
             isSpinning = false;
-            currentRotation = targetRotation;
+            currentRotation = initialRotation + totalRotation;
             drawWheel();
             showResult();
             spinBtn.classList.remove('disabled');
         }
     }
 
-    currentRotation = targetRotation - totalRotation;
     animate();
+}
+
+function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
 }
 
 function showResult() {
@@ -229,7 +239,6 @@ function showResult() {
     const resultEl = document.getElementById('resultText');
     resultEl.classList.remove('result-animation');
     resultEl.innerHTML = `🎉 ${selectedItem}! 🎉`;
-    // Trigger animation
     void resultEl.offsetWidth;
     resultEl.classList.add('result-animation');
     
@@ -241,38 +250,44 @@ function showResult() {
         date: new Date().toLocaleDateString('vi-VN')
     });
 
-    if (state.history.length > 50) state.history.pop();
+    if (state.history.length > 100) state.history.pop();
 
     playWinSound();
     saveState();
     updateUI();
 }
 
-// ==================== MODAL EDIT ====================
+// ==================== MODALS ====================
 function openNewWheelModal() {
     document.getElementById('modalTitle').textContent = 'Tạo Vòng Quay Mới';
+    document.getElementById('wheelNameInput').value = '';
     document.getElementById('itemsInput').value = '';
-    document.getElementById('itemCount').textContent = '0';
+    updateItemCount();
     document.getElementById('editModal').classList.add('show');
 }
 
 function openEditWheelModal() {
     document.getElementById('modalTitle').textContent = 'Chỉnh Sửa Vòng Quay';
+    document.getElementById('wheelNameInput').value = state.currentWheel?.name || '';
     document.getElementById('itemsInput').value = state.currentWheel?.items.join('\n') || '';
     updateItemCount();
     document.getElementById('editModal').classList.add('show');
 }
 
 function closeEditModal() {
-    document.getElementById('editModal').classList.remove('show');
+    const modal = document.getElementById('editModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
 }
 
 function updateItemCount() {
     const items = document.getElementById('itemsInput').value.trim().split('\n').filter(i => i.trim());
-    document.getElementById('itemCount').textContent = items.length;
+    document.getElementById('itemCountInfo').textContent = items.length + ' lựa chọn';
 }
 
 function saveWheel() {
+    const wheelName = document.getElementById('wheelNameInput').value.trim() || 'Vòng Quay VNLMS';
     const itemsText = document.getElementById('itemsInput').value.trim();
     const items = itemsText.split('\n').map(i => i.trim()).filter(i => i);
 
@@ -283,15 +298,15 @@ function saveWheel() {
 
     const wheel = {
         id: state.currentWheel?.id || Date.now(),
-        name: 'Vòng Quay VNLMS',
+        name: wheelName,
         items: items,
         createdAt: state.currentWheel?.createdAt || new Date().toISOString()
     };
 
     state.currentWheel = wheel;
     generateColors();
+    state.history = [];
 
-    // Lưu vào danh sách
     const existingIndex = state.wheels.findIndex(w => w.id === wheel.id);
     if (existingIndex >= 0) {
         state.wheels[existingIndex] = wheel;
@@ -299,13 +314,12 @@ function saveWheel() {
         state.wheels.push(wheel);
     }
 
-    state.history = [];
     saveState();
     updateUI();
-    setTimeout(() => closeEditModal(), 100);
+    closeEditModal();
 }
 
-// ==================== MODAL SAVED WHEELS ====================
+// ==================== SAVED WHEELS ====================
 function openSavedWheelsModal() {
     displaySavedWheels();
     document.getElementById('savedWheelsModal').classList.add('show');
@@ -317,6 +331,8 @@ function closeSavedWheelsModal() {
 
 function displaySavedWheels() {
     const list = document.getElementById('savedWheelsList');
+    if (!list) return;
+    
     list.innerHTML = '';
 
     if (state.wheels.length === 0) {
@@ -342,7 +358,7 @@ function displaySavedWheels() {
 }
 
 function loadWheel(wheelId) {
-    const wheel = state.wheels.find(w => w.id === wheelId);
+    const wheel = state.wheels.find(w => w.id === wheelId || w.id.toString() === wheelId.toString());
     if (wheel) {
         state.currentWheel = wheel;
         state.history = [];
@@ -354,13 +370,13 @@ function loadWheel(wheelId) {
 
 function deleteWheel(wheelId) {
     if (confirm('Xóa vòng quay này?')) {
-        state.wheels = state.wheels.filter(w => w.id !== wheelId);
+        state.wheels = state.wheels.filter(w => w.id !== wheelId && w.id.toString() !== wheelId.toString());
         saveState();
         displaySavedWheels();
     }
 }
 
-// ==================== MODAL SHARE ====================
+// ==================== SHARE ====================
 function openShareModal() {
     document.getElementById('shareMessage').textContent = '';
     document.getElementById('shareModal').classList.add('show');
@@ -373,7 +389,7 @@ function closeShareModal() {
 function shareJson() {
     const json = JSON.stringify(state.currentWheel, null, 2);
     navigator.clipboard.writeText(json).then(() => {
-        showMessage('JSON đã sao chép!');
+        showMessage('JSON đã sao chép vào clipboard!');
     });
 }
 
@@ -383,22 +399,22 @@ function downloadJson() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${state.currentWheel.name}.json`;
+    a.download = `${state.currentWheel.name.replace(/\s+/g, '-')}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    showMessage('Tải xuống thành công!');
+    showMessage('Tải JSON thành công!');
 }
 
 function exportCsv() {
-    let csv = 'Lựa chọn\n';
+    let csv = '"Lựa chọn"\n';
     state.currentWheel.items.forEach(item => {
-        csv += `"${item}"\n`;
+        csv += `"${item.replace(/"/g, '""')}"\n`;
     });
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${state.currentWheel.name}.csv`;
+    a.download = `${state.currentWheel.name.replace(/\s+/g, '-')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     showMessage('Xuất CSV thành công!');
@@ -409,18 +425,18 @@ function showMessage(msg) {
     msgEl.textContent = msg;
     setTimeout(() => {
         msgEl.textContent = '';
-    }, 2000);
+    }, 2500);
 }
 
-// ==================== LỊCH SỬ VÀ THỐNG KÊ ====================
+// ==================== HISTORY & STATS ====================
 function copyResult() {
-    const text = document.getElementById('resultText').textContent;
-    navigator.clipboard.writeText(text.replace('🎉 ', '').replace('! 🎉', ''));
+    const text = document.getElementById('resultText').textContent.replace(/🎉 |! 🎉/g, '');
+    navigator.clipboard.writeText(text);
     alert('Đã sao chép!');
 }
 
 function clearHistory() {
-    if (confirm('Xóa lịch sử quay?')) {
+    if (confirm('Xóa toàn bộ lịch sử quay?')) {
         state.history = [];
         saveState();
         updateUI();
@@ -436,9 +452,11 @@ function updateUI() {
 
 function updateItems() {
     const itemsList = document.getElementById('itemsList');
+    if (!itemsList) return;
+    
     itemsList.innerHTML = '';
 
-    if (!state.currentWheel || state.currentWheel.items.length === 0) {
+    if (!state.currentWheel || !state.currentWheel.items || state.currentWheel.items.length === 0) {
         itemsList.innerHTML = '<p class="empty-message">Tạo vòng quay mới để xem danh sách</p>';
         return;
     }
@@ -463,11 +481,11 @@ function updateHistory() {
     historyList.innerHTML = '';
 
     if (state.history.length === 0) {
-        historyList.innerHTML = '<p class="empty-message">Chưa có kết quả</p>';
+        historyList.innerHTML = '<p class="empty-message">Chưa có lịch sử quay</p>';
         return;
     }
 
-    state.history.slice(0, 15).forEach(item => {
+    state.history.slice(0, 20).forEach(item => {
         const div = document.createElement('div');
         div.className = 'history-item';
         div.innerHTML = `
@@ -505,7 +523,7 @@ function updateStats() {
         });
 }
 
-// ==================== CHỦ ĐỀ ====================
+// ==================== THEME ====================
 function toggleTheme() {
     state.darkMode = !state.darkMode;
     applyTheme();
@@ -522,7 +540,7 @@ function applyTheme() {
     }
 }
 
-// ==================== ÂM THANH ====================
+// ==================== SOUND ====================
 function toggleSound() {
     state.soundEnabled = !state.soundEnabled;
     document.getElementById('soundBtn').textContent = state.soundEnabled ? '🔊' : '🔇';
@@ -531,50 +549,58 @@ function toggleSound() {
 
 function playSound() {
     if (!state.soundEnabled) return;
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+    
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
 
-    oscillator.frequency.value = 400;
-    oscillator.type = 'sine';
+        oscillator.frequency.value = 400;
+        oscillator.type = 'sine';
 
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
 
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.1);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (e) {
+        console.log('Audio context not available');
+    }
 }
 
 function playWinSound() {
     if (!state.soundEnabled) return;
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
-    // Tạo âm thanh thắng đôi
-    const notes = [523.25, 659.25, 783.99, 987.77]; // C5, E5, G5, B5
-    
-    notes.forEach((freq, index) => {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const notes = [523.25, 659.25, 783.99, 987.77];
         
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = freq;
-        oscillator.type = 'sine';
-        
-        const startTime = audioContext.currentTime + (index * 0.15);
-        gainNode.gain.setValueAtTime(0.2, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
-        
-        oscillator.start(startTime);
-        oscillator.stop(startTime + 0.2);
-    });
+        notes.forEach((freq, index) => {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = freq;
+            oscillator.type = 'sine';
+            
+            const startTime = audioContext.currentTime + (index * 0.15);
+            gainNode.gain.setValueAtTime(0.2, startTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
+            
+            oscillator.start(startTime);
+            oscillator.stop(startTime + 0.2);
+        });
+    } catch (e) {
+        console.log('Audio context not available');
+    }
 }
 
-// ==================== LƯU TRỮ ====================
+// ==================== STORAGE ====================
 function saveState() {
     localStorage.setItem('wheelGameState', JSON.stringify(state));
 }
@@ -582,14 +608,30 @@ function saveState() {
 function loadState() {
     const saved = localStorage.getItem('wheelGameState');
     if (saved) {
-        state = JSON.parse(saved);
+        try {
+            state = JSON.parse(saved);
+        } catch (e) {
+            console.log('Failed to load saved state');
+        }
     }
 }
 
 // ==================== RESPONSIVE ====================
 function resizeCanvas() {
     const container = document.querySelector('.wheel-container');
-    const size = Math.min(container.offsetWidth, 400);
+    if (!container) return;
+    
+    const size = Math.min(container.offsetWidth - 40, 400);
+    canvas.width = size;
+    canvas.height = size;
+    drawWheel();
+}
+
+// ==================== RESPONSIVE ====================
+function resizeCanvas() {
+    const container = document.querySelector('.wheel-container');
+    if (!container) return;
+    const size = Math.min(container.offsetWidth - 40, 400);
     canvas.width = size;
     canvas.height = size;
     drawWheel();
